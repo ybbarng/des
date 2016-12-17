@@ -138,5 +138,30 @@ int SBox[8][64] = {
     }
 };
 
-int main(void) {
+long long int DES(int index, long long int *MD, long long int *keys) {
+}
+
+long int F(unsigned int c, long long int key) {
+}
+
+
+void encryption(char *in, char *out, char *key) {
+}
+
+void decryption(char *in, char *out, char *key) {
+}
+
+int main(int argc, char** argv) {
+    switch(argv[1][0]) {
+        case 'e':
+            printf("encryption\n");
+            encryption(argv[2], argv[3], argv[4]);
+            break;
+        case 'd':
+            printf("decryption\n");
+            decryption(argv[2], argv[3], argv[4]);
+            break;
+        default:
+            printf("mode must be 'e' or 'd'\n");
+    }
 }
