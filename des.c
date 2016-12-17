@@ -138,7 +138,23 @@ int SBox[8][64] = {
     }
 };
 
+long long int permutation(long long int *data, int data_size, int *table, int table_size) {
+    long long int result = 0;
+    for (int i = 0; i < table_size; i++) {
+        result = (result << 1) + ((*data >> (data_size - 1 - table[i])) & 0x1);
+    }
+    return result;
+}
+
+long long int sub_keys[16] = {};
+void generate_sub_keys(long long int *keys) {
+    long long int left = permutation(keys, 64, PC1_LEFT, 28);
+    long long int right = permutation(keys, 64, PC1_RIGHT, 28);
+}
+
+
 long long int DES(int index, long long int *MD, long long int *keys) {
+    generate_sub_keys(keys);
 }
 
 long int F(unsigned int c, long long int key) {
@@ -159,10 +175,14 @@ void des_with_file(int decrypt, char *in, char *out, char *key) {
     for (int i = 0; i < 8; i++) {
         MD = (MD << 8) + buf[i];
     }
+    long long int binary_key = 0;
+    for (int i = 0; i < 8; i++) {
+        binary_key = (binary_key << 8) + key[i];
+    }
     // printf("%llu\n", MD);
 
-    //long long int result = DES(decrypt, MD, 0);
-    long long int result = 4919429789377582090;
+    long long int result = DES(decrypt, &MD, &binary_key);
+
     for (int i = 0; i < 8; i++) {
         buf[7 - i] = ((result >> (i * 8)) & 0xFF);
     }
