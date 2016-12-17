@@ -230,11 +230,22 @@ def bitlist_to_hex(data):
 
 
 def binary_to_bitlist(data):
-    return hex_to_bitlist(''.join('{:02x}'.format(ch) for ch in data))
+    result = []
+    for ch in data:
+        for i in range(7, -1, -1):
+            result.append(1 if ch & (1 << i) != 0 else 0)
+    return result
 
 
 def bitlist_to_binary(data):
-    return bytearray.fromhex(bitlist_to_hex(data))
+    result = []
+    buf = 0
+    for i, value in enumerate(data):
+        buf = (buf << 1) + value
+        if i % 8 == 7:
+            result.append(buf)
+            buf = 0
+    return bytes(result)
 
 
 def des_with_file(decrypt, in_file, out_file, key):
