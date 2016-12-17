@@ -208,6 +208,7 @@ void encryption(char *in, char *out, char *key) {
 }
 
 void decryption(char *in, char *out, char *key) {
+    des_with_file(1, in, out, key);
 }
 
 int main(int argc, char** argv) {
