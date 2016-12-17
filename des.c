@@ -140,7 +140,8 @@ int SBox[8][64] = {
 
 long long int permutation(long long int *data, int data_size, int *table, int table_size) {
     long long int result = 0;
-    for (int i = 0; i < table_size; i++) {
+    int i = 0;
+    for (; i < table_size; i++) {
         result = (result << 1) + ((*data >> (data_size - 1 - table[i])) & 0x1);
     }
     return result;
@@ -151,7 +152,8 @@ void generate_sub_keys(long long int *keys) {
     int half_key_length = 28;
     long long int left = permutation(keys, 64, PC1_LEFT, half_key_length);
     long long int right = permutation(keys, 64, PC1_RIGHT, half_key_length);
-    for (int i = 0; i < 16; i++) {
+    int i = 0;
+    for (; i < 16; i++) {
         int rotation = Rotations[i];
         left = (((left << rotation) | (left >> (half_key_length - rotation))) & 0xFFFFFFF);
         right = (((right << rotation) | (right >> (half_key_length - rotation))) & 0xFFFFFFF);
@@ -163,7 +165,8 @@ void generate_sub_keys(long long int *keys) {
 long long int substitution(long long int data) {
     // data: 48 bit
     long long int result = 0;
-    for (int i = 0; i < 8; i++) {
+    int i = 0;
+    for (; i < 8; i++) {
         unsigned int box = data >> (6 * (7 - i)) & 0x3F;
         int outer = ((box & 0x20) >> 4) | (box & 0x1);
         int inner = (box & 0x1E) >> 1;
@@ -185,7 +188,8 @@ long long int DES(int index, long long int *MD, long long int *keys) {
     long long int data = permutation(MD, 64, IP, 64);
     unsigned int left = data >> 32;
     unsigned int right = (int) data;
-    for (int i = 0; i < 16; i++) {
+    int i = 0;
+    for (; i < 16; i++) {
         int sub_key_index = (index ? 15 - i : i);
         unsigned int buf = left ^ F(right, sub_keys[sub_key_index]);
         left = right;
@@ -208,17 +212,18 @@ void des_with_file(int decrypt, char *in, char *out, char *key) {
     fclose(in_fp);
 
     long long int MD = 0;
-    for (int i = 0; i < 8; i++) {
+    int i = 0;
+    for (; i < 8; i++) {
         MD = (MD << 8) + (buf[i] & 0xFF);
     }
     long long int binary_key = 0;
-    for (int i = 0; i < 8; i++) {
+    for (i = 0; i < 8; i++) {
         binary_key = (binary_key << 8) + (key[i] & 0xFF);
     }
 
     long long int result = DES(decrypt, &MD, &binary_key);
 
-    for (int i = 0; i < 8; i++) {
+    for (i = 0; i < 8; i++) {
         buf[7 - i] = ((result >> (i * 8)) & 0xFF);
     }
     FILE *out_fp = fopen(out, "wb");
