@@ -146,6 +146,24 @@ long int F(unsigned int c, long long int key) {
 
 
 void encryption(char *in, char *out, char *key) {
+    int buf_size = 8;
+    char buf[buf_size];
+    FILE *in_fp = fopen(in, "rb");
+    if (in_fp == NULL) {
+        printf("Can't open the in file :%s\n", in);
+        return;
+    }
+    fread(buf, buf_size, 1, in_fp);
+    fclose(in_fp);
+
+    char *result = "encrypt\n";
+    FILE *out_fp = fopen(out, "wb");
+    if (out_fp == NULL) {
+        printf("Can't open the out file :%s\n", out);
+        return;
+    }
+    fwrite(result, buf_size, 1, out_fp);
+    fclose(out_fp);
 }
 
 void decryption(char *in, char *out, char *key) {
