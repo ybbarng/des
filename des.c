@@ -144,8 +144,7 @@ long long int DES(int index, long long int *MD, long long int *keys) {
 long int F(unsigned int c, long long int key) {
 }
 
-
-void encryption(char *in, char *out, char *key) {
+void des_with_file(int decrypt, char *in, char *out, char *key) {
     int buf_size = 8;
     char buf[buf_size];
     FILE *in_fp = fopen(in, "rb");
@@ -156,14 +155,28 @@ void encryption(char *in, char *out, char *key) {
     fread(buf, buf_size, 1, in_fp);
     fclose(in_fp);
 
-    char *result = "encrypt\n";
+    long long int MD = 0;
+    for (int i = 0; i < 8; i++) {
+        MD = (MD << 8) + buf[i];
+    }
+    // printf("%llu\n", MD);
+
+    //long long int result = DES(decrypt, MD, 0);
+    long long int result = 4919429789377582090;
+    for (int i = 0; i < 8; i++) {
+        buf[7 - i] = ((result >> (i * 8)) & 0xFF);
+    }
     FILE *out_fp = fopen(out, "wb");
     if (out_fp == NULL) {
         printf("Can't open the out file :%s\n", out);
         return;
     }
-    fwrite(result, buf_size, 1, out_fp);
+    fwrite(buf, buf_size, 1, out_fp);
     fclose(out_fp);
+}
+
+void encryption(char *in, char *out, char *key) {
+    des_with_file(0, in, out, key);
 }
 
 void decryption(char *in, char *out, char *key) {
