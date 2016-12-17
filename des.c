@@ -148,8 +148,16 @@ long long int permutation(long long int *data, int data_size, int *table, int ta
 
 long long int sub_keys[16] = {};
 void generate_sub_keys(long long int *keys) {
-    long long int left = permutation(keys, 64, PC1_LEFT, 28);
-    long long int right = permutation(keys, 64, PC1_RIGHT, 28);
+    int half_key_length = 28;
+    long long int left = permutation(keys, 64, PC1_LEFT, half_key_length);
+    long long int right = permutation(keys, 64, PC1_RIGHT, half_key_length);
+    for (int i = 0; i < 16; i++) {
+        int rotation = Rotations[i];
+        left = (((left << rotation) | (left >> (half_key_length - rotation))) & 0xFFFFFFF);
+        right = (((right << rotation) | (right >> (half_key_length - rotation))) & 0xFFFFFFF);
+        long long int new_key = (left << half_key_length) | right;
+        sub_keys[i] = permutation(&new_key, half_key_length * 2, PC2, 48);
+    }
 }
 
 
