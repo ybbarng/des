@@ -160,12 +160,40 @@ void generate_sub_keys(long long int *keys) {
     }
 }
 
-
-long long int DES(int index, long long int *MD, long long int *keys) {
-    generate_sub_keys(keys);
+long long int substitution(long long int data) {
+    // data: 48 bit
+    long long int result = 0;
+    for (int i = 0; i < 8; i++) {
+        unsigned int box = data >> (6 * (7 - i)) & 0x3F;
+        int outer = ((box & 0x20) >> 4) | (box & 0x1);
+        int inner = (box & 0x1E) >> 1;
+        result = (result << 4) + SBox[i][(outer << 4) + inner];
+    }
+    return result;
 }
 
 long int F(unsigned int c, long long int key) {
+    long long int lc = c;
+    long long int new_c = permutation(&lc, 32, E, 48);
+    long long int mixed_data = new_c ^ key;
+    long long int s_box_result = substitution(mixed_data);
+    return permutation(&s_box_result, 32, P, 32);
+}
+
+long long int DES(int index, long long int *MD, long long int *keys) {
+    generate_sub_keys(keys);
+    long long int data = permutation(MD, 64, IP, 64);
+    unsigned int left = data >> 32;
+    unsigned int right = (int) data;
+    for (int i = 0; i < 16; i++) {
+        int sub_key_index = (index ? 15 - i : i);
+        unsigned int buf = left ^ F(right, sub_keys[sub_key_index]);
+        left = right;
+        right = buf;
+    }
+    data = right;
+    data = (data << 32) + left;
+    return permutation(&data, 64, FP, 64);
 }
 
 void des_with_file(int decrypt, char *in, char *out, char *key) {
@@ -181,13 +209,12 @@ void des_with_file(int decrypt, char *in, char *out, char *key) {
 
     long long int MD = 0;
     for (int i = 0; i < 8; i++) {
-        MD = (MD << 8) + buf[i];
+        MD = (MD << 8) + (buf[i] & 0xFF);
     }
     long long int binary_key = 0;
     for (int i = 0; i < 8; i++) {
-        binary_key = (binary_key << 8) + key[i];
+        binary_key = (binary_key << 8) + (key[i] & 0xFF);
     }
-    // printf("%llu\n", MD);
 
     long long int result = DES(decrypt, &MD, &binary_key);
 
