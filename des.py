@@ -137,11 +137,13 @@ SBox = [
         2, 1, 14, 7, 4, 10, 8, 13, 15, 12, 9, 0, 3, 5, 6, 11
     ]
 ]
-def DES(index, MD, keys):
+def DES(decrypt, MD, keys):
     sub_keys = generate_sub_keys(keys)
     data = permutation(MD, IP)
     left = data[:32]
     right = data[32:]
+    if decrypt:
+        sub_keys = reversed(sub_keys)
     for sub_key in sub_keys:
         left, right = right, xor(left, F(right, sub_key))
     data = permutation(right + left, FP)
@@ -227,5 +229,7 @@ if __name__ == '__main__':
     # plain = string_to_bitlist('DESTESTT')
     plain = hex_to_bitlist('4445535445535454') # DESTESTT
     encrypt = hex_to_bitlist('01ecf0428c98db57')
-    data = DES(0, plain, key)
+    data = DES(False, plain, key)
     print(encrypt == data)
+    new_data = DES(True, data, key)
+    print(new_data == plain)
