@@ -1,5 +1,6 @@
 from itertools import accumulate
 
+
 # Initial Permutation
 IP = [
     57, 49, 41, 33, 25, 17,  9,  1,
@@ -137,6 +138,8 @@ SBox = [
         2, 1, 14, 7, 4, 10, 8, 13, 15, 12, 9, 0, 3, 5, 6, 11
     ]
 ]
+
+
 def DES(decrypt, MD, keys):
     sub_keys = generate_sub_keys(keys)
     data = permutation(MD, IP)
@@ -149,11 +152,13 @@ def DES(decrypt, MD, keys):
     data = permutation(right + left, FP)
     return data
 
+
 def F(c, key):
     new_c = expansion(c)
     mixed_data = key_mixing(new_c, key)
     s_box_result = substitution(mixed_data)
     return permutation(s_box_result)
+
 
 def generate_sub_keys(keys):
     left = permutation(keys, PC1_LEFT)
@@ -163,17 +168,22 @@ def generate_sub_keys(keys):
         sub_keys.append(permutation(left[i:] + left[:i] + right[i:] + right[:i], PC2))
     return sub_keys
 
+
 def expansion(c):
     return permutation(c, E)
+
 
 def permutation(data, table=P):
     return [data[i] for i in table]
 
+
 def key_mixing(data, key):
     return xor(data, key)
 
+
 def xor(data1, data2):
     return [d1 ^ d2 for d1, d2 in zip(data1, data2)]
+
 
 def substitution(data):
     '''
@@ -189,6 +199,7 @@ def substitution(data):
         for i in range(3, -1, -1):
             result.append((value & 2**i) >> i)
     return result
+
 
 def string_to_bitlist(data):
     result = []
@@ -206,6 +217,7 @@ def hex_to_bitlist(data):
             result.append(1 if int(ch, 16) & (1 << i) != 0 else 0)
     return result
 
+
 def bitlist_to_hex(data):
     result = []
     buf = 0
@@ -217,14 +229,31 @@ def bitlist_to_hex(data):
     return ''.join(result)
 
 
-def encryption(input, out, key):
-    pass
-
-def decryption(input, out, key):
-    pass
+def binary_to_bitlist(data):
+    return hex_to_bitlist(''.join('{:02x}'.format(ch) for ch in data))
 
 
-if __name__ == '__main__':
+def bitlist_to_binary(data):
+    return bytearray.fromhex(bitlist_to_hex(data))
+
+
+def des_with_file(decrypt, in_file, out_file, key):
+    with open(in_file, 'rb') as f:
+        data = f.read()
+    result = DES(decrypt, binary_to_bitlist(data), string_to_bitlist(key))
+    with open(out_file, 'wb') as f:
+        f.write(bitlist_to_binary(result))
+
+
+def encryption(in_file, out_file, key):
+    des_with_file(False, in_file, out_file, key)
+
+
+def decryption(in_file, out_file, key):
+    des_with_file(True, in_file, out_file, key)
+
+
+def test():
     key = string_to_bitlist('TESTTEST')
     # plain = string_to_bitlist('DESTESTT')
     plain = hex_to_bitlist('4445535445535454') # DESTESTT
@@ -233,3 +262,17 @@ if __name__ == '__main__':
     print(encrypt == data)
     new_data = DES(True, data, key)
     print(new_data == plain)
+
+
+if __name__ == '__main__':
+    from sys import argv
+
+    modes = {
+        'e': encryption,
+        'd': decryption
+    }
+    if argv[1] not in modes:
+        print('mode must be \'e\' or \'d\'')
+    else:
+        modes[argv[1]](*argv[2:])
+
