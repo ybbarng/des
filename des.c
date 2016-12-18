@@ -202,9 +202,10 @@ long long int DES(int index, long long int *MD, long long int *keys) {
     return permutation(data, 64, FP, 64);
 }
 
+unsigned int n_blocks = 0;
 void des_with_file(int decrypt, char *in, char *out, char *key) {
-    int buf_size = 8;
-    char buf[buf_size];
+    int buf_size = 8 * n_blocks;
+    char *buf = (char *) malloc(sizeof(char) * buf_size);
     FILE *in_fp = fopen(in, "rb");
     if (in_fp == NULL) {
         printf("Can't open the in file :%s\n", in);
@@ -213,10 +214,15 @@ void des_with_file(int decrypt, char *in, char *out, char *key) {
     fread(buf, buf_size, 1, in_fp);
     fclose(in_fp);
 
-    long long int MD = 0;
+    long long int *MD = (long long int *) malloc(sizeof(long long int) * n_blocks);
     int i = 0;
-    for (; i < 8; i++) {
-        MD = (MD << 8) + (buf[i] & 0xFF);
+    int j = 0;
+    for (i = 0; i < n_blocks; i++) {
+        long long int block = 0;
+        for (j = 0; j < 8; j++) {
+            block = (block << 8) + (buf[j] & 0xFF);
+        }
+        MD[i] = block;
     }
     long long int binary_key = 0;
     for (i = 0; i < 8; i++) {
@@ -224,11 +230,16 @@ void des_with_file(int decrypt, char *in, char *out, char *key) {
     }
 
     long long int *sub_keys = generate_sub_keys(binary_key, decrypt);
-    long long int result = DES(decrypt, &MD, sub_keys);
+    long long int *results = (long long int *) malloc(sizeof(long long int) * n_blocks);
+    for (i = 0; i < n_blocks; i++) {
+        results[i] = DES(i, MD, sub_keys);
+    }
     free(sub_keys);
 
-    for (i = 0; i < 8; i++) {
-        buf[7 - i] = ((result >> (i * 8)) & 0xFF);
+    for (i = 0; i < n_blocks; i++) {
+        for (j = 0; j < 8; j++) {
+            buf[(i * 8) + (7 - j)] = ((results[i] >> (j * 8)) & 0xFF);
+        }
     }
     FILE *out_fp = fopen(out, "wb");
     if (out_fp == NULL) {
@@ -237,6 +248,9 @@ void des_with_file(int decrypt, char *in, char *out, char *key) {
     }
     fwrite(buf, buf_size, 1, out_fp);
     fclose(out_fp);
+    free(buf);
+    free(MD);
+    free(results);
 }
 
 void encryption(char *in, char *out, char *key) {
@@ -248,6 +262,12 @@ void decryption(char *in, char *out, char *key) {
 }
 
 int main(int argc, char** argv) {
+    if (argc < 6) {
+        printf("usage) ./des.out [e|d] <input_file> <output_file> <n_blocks>\n");
+        printf("example) ./des.out e in.txt out.txt 1\n");
+        return -1;
+    }
+    sscanf(argv[5], "%d", &n_blocks);
     switch(argv[1][0]) {
         case 'e':
             printf("encryption\n");
