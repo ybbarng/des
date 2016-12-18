@@ -148,19 +148,20 @@ long long int permutation(long long int data, int data_size, int *table, int tab
     return result;
 }
 
-long long int *generate_sub_keys(long long int keys) {
+long long int *generate_sub_keys(long long int key, int decrypt) {
     int n_keys = 16;
     long long int *sub_keys = (long long int *) malloc(sizeof(long long int) * n_keys);
     int half_key_length = 28;
-    long long int left = permutation(keys, 64, PC1_LEFT, half_key_length);
-    long long int right = permutation(keys, 64, PC1_RIGHT, half_key_length);
+    long long int left = permutation(key, 64, PC1_LEFT, half_key_length);
+    long long int right = permutation(key, 64, PC1_RIGHT, half_key_length);
     int i = 0;
     for (; i < n_keys; i++) {
         int rotation = Rotations[i];
         left = (((left << rotation) | (left >> (half_key_length - rotation))) & 0xFFFFFFF);
         right = (((right << rotation) | (right >> (half_key_length - rotation))) & 0xFFFFFFF);
         long long int new_key = (left << half_key_length) | right;
-        sub_keys[i] = permutation(new_key, half_key_length * 2, PC2, 48);
+        int sub_key_index = (decrypt ? 15 - i : i);
+        sub_keys[sub_key_index] = permutation(new_key, half_key_length * 2, PC2, 48);
     }
     return sub_keys;
 }
@@ -192,8 +193,7 @@ long long int DES(int index, long long int *MD, long long int *keys) {
     unsigned int right = (int) data;
     int i = 0;
     for (; i < 16; i++) {
-        int sub_key_index = (index ? 15 - i : i);
-        unsigned int buf = left ^ F(right, keys[sub_key_index]);
+        unsigned int buf = left ^ F(right, keys[i]);
         left = right;
         right = buf;
     }
@@ -223,7 +223,7 @@ void des_with_file(int decrypt, char *in, char *out, char *key) {
         binary_key = (binary_key << 8) + (key[i] & 0xFF);
     }
 
-    long long int *sub_keys = generate_sub_keys(binary_key);
+    long long int *sub_keys = generate_sub_keys(binary_key, decrypt);
     long long int result = DES(decrypt, &MD, sub_keys);
     free(sub_keys);
 
