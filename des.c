@@ -187,8 +187,8 @@ long int F(unsigned int c, long long int key) {
     return permutation(s_box_result, 32, P, 32);
 }
 
-long long int DES(int index, long long int *MD, long long int *keys) {
-    long long int data = permutation(*MD, 64, IP, 64);
+void DES(int index, long long int *MD, long long int *keys) {
+    long long int data = permutation(MD[index], 64, IP, 64);
     unsigned int left = data >> 32;
     unsigned int right = (int) data;
     int i = 0;
@@ -199,7 +199,7 @@ long long int DES(int index, long long int *MD, long long int *keys) {
     }
     data = right;
     data = (data << 32) + left;
-    return permutation(data, 64, FP, 64);
+    MD[index] = permutation(data, 64, FP, 64);
 }
 
 unsigned int n_blocks = 0;
@@ -220,7 +220,7 @@ void des_with_file(int decrypt, char *in, char *out, char *key) {
     for (i = 0; i < n_blocks; i++) {
         long long int block = 0;
         for (j = 0; j < 8; j++) {
-            block = (block << 8) + (buf[j] & 0xFF);
+            block = (block << 8) + (buf[(i * 8) + j] & 0xFF);
         }
         MD[i] = block;
     }
@@ -230,15 +230,14 @@ void des_with_file(int decrypt, char *in, char *out, char *key) {
     }
 
     long long int *sub_keys = generate_sub_keys(binary_key, decrypt);
-    long long int *results = (long long int *) malloc(sizeof(long long int) * n_blocks);
     for (i = 0; i < n_blocks; i++) {
-        results[i] = DES(i, MD, sub_keys);
+        DES(i, MD, sub_keys);
     }
     free(sub_keys);
 
     for (i = 0; i < n_blocks; i++) {
         for (j = 0; j < 8; j++) {
-            buf[(i * 8) + (7 - j)] = ((results[i] >> (j * 8)) & 0xFF);
+            buf[(i * 8) + (7 - j)] = ((MD[i] >> (j * 8)) & 0xFF);
         }
     }
     FILE *out_fp = fopen(out, "wb");
@@ -250,7 +249,6 @@ void des_with_file(int decrypt, char *in, char *out, char *key) {
     fclose(out_fp);
     free(buf);
     free(MD);
-    free(results);
 }
 
 void encryption(char *in, char *out, char *key) {
