@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 // Initial Permutation
 int IP[64] = {
@@ -138,28 +139,30 @@ int SBox[8][64] = {
     }
 };
 
-long long int permutation(long long int *data, int data_size, int *table, int table_size) {
+long long int permutation(long long int data, int data_size, int *table, int table_size) {
     long long int result = 0;
     int i = 0;
     for (; i < table_size; i++) {
-        result = (result << 1) + ((*data >> (data_size - 1 - table[i])) & 0x1);
+        result = (result << 1) + ((data >> (data_size - 1 - table[i])) & 0x1);
     }
     return result;
 }
 
-long long int sub_keys[16] = {};
-void generate_sub_keys(long long int *keys) {
+long long int *generate_sub_keys(long long int keys) {
+    int n_keys = 16;
+    long long int *sub_keys = (long long int *) malloc(sizeof(long long int) * n_keys);
     int half_key_length = 28;
     long long int left = permutation(keys, 64, PC1_LEFT, half_key_length);
     long long int right = permutation(keys, 64, PC1_RIGHT, half_key_length);
     int i = 0;
-    for (; i < 16; i++) {
+    for (; i < n_keys; i++) {
         int rotation = Rotations[i];
         left = (((left << rotation) | (left >> (half_key_length - rotation))) & 0xFFFFFFF);
         right = (((right << rotation) | (right >> (half_key_length - rotation))) & 0xFFFFFFF);
         long long int new_key = (left << half_key_length) | right;
-        sub_keys[i] = permutation(&new_key, half_key_length * 2, PC2, 48);
+        sub_keys[i] = permutation(new_key, half_key_length * 2, PC2, 48);
     }
+    return sub_keys;
 }
 
 long long int substitution(long long int data) {
@@ -177,27 +180,26 @@ long long int substitution(long long int data) {
 
 long int F(unsigned int c, long long int key) {
     long long int lc = c;
-    long long int new_c = permutation(&lc, 32, E, 48);
+    long long int new_c = permutation(lc, 32, E, 48);
     long long int mixed_data = new_c ^ key;
     long long int s_box_result = substitution(mixed_data);
-    return permutation(&s_box_result, 32, P, 32);
+    return permutation(s_box_result, 32, P, 32);
 }
 
 long long int DES(int index, long long int *MD, long long int *keys) {
-    generate_sub_keys(keys);
-    long long int data = permutation(MD, 64, IP, 64);
+    long long int data = permutation(*MD, 64, IP, 64);
     unsigned int left = data >> 32;
     unsigned int right = (int) data;
     int i = 0;
     for (; i < 16; i++) {
         int sub_key_index = (index ? 15 - i : i);
-        unsigned int buf = left ^ F(right, sub_keys[sub_key_index]);
+        unsigned int buf = left ^ F(right, keys[sub_key_index]);
         left = right;
         right = buf;
     }
     data = right;
     data = (data << 32) + left;
-    return permutation(&data, 64, FP, 64);
+    return permutation(data, 64, FP, 64);
 }
 
 void des_with_file(int decrypt, char *in, char *out, char *key) {
@@ -221,7 +223,9 @@ void des_with_file(int decrypt, char *in, char *out, char *key) {
         binary_key = (binary_key << 8) + (key[i] & 0xFF);
     }
 
-    long long int result = DES(decrypt, &MD, &binary_key);
+    long long int *sub_keys = generate_sub_keys(binary_key);
+    long long int result = DES(decrypt, &MD, sub_keys);
+    free(sub_keys);
 
     for (i = 0; i < 8; i++) {
         buf[7 - i] = ((result >> (i * 8)) & 0xFF);
