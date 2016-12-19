@@ -162,4 +162,13 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+### CUDA ###
+*.i
+*.ii
+*.gpu
+*.ptx
+*.cubin
+*.fatbin
+
 *.txt
+output
