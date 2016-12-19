@@ -215,27 +215,35 @@ void DES(int index, long long int *MD, long long int *keys) {
 }
 
 __global__
-void global_DES(unsigned int n_blocks, long long int *MD, long long int *keys) {
+void kernel_DES(unsigned int n_blocks, long long int *MD, long long int *keys) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= n_blocks) {
         return;
     }
-    DES(0, &MD[index], keys);
+    DES(index, MD, keys);
 }
 
-void runDESCuda(unsigned int n_blocks, long long int *host_MD, long long int *host_sub_keys) {
+void runDESCuda(unsigned int n_blocks, long long int *host_MD, long long int *host_sub_keys, int n_cuda_blocks, int n_cuda_threads) {
+    unsigned int max_n_threads = 512;
+    if (n_cuda_threads > max_n_threads) {
+        printf("Maximum value of the number of threads is 512. You entered : %d\n", n_cuda_threads);
+        return;
+    }
     cudaMemcpyToSymbol(IP, host_IP, sizeof(host_IP));
     cudaMemcpyToSymbol(FP, host_FP, sizeof(host_FP));
     cudaMemcpyToSymbol(E, host_E, sizeof(host_E));
     cudaMemcpyToSymbol(P, host_P, sizeof(host_P));
     cudaMemcpyToSymbol(SBox, host_SBox, sizeof(host_SBox));
+
     long long int *MD, *sub_keys;
     cudaMalloc((void **) &MD, sizeof(long long int) * n_blocks);
     cudaMemcpy(MD, host_MD, sizeof(long long int) * n_blocks, cudaMemcpyHostToDevice);
     cudaMalloc((void **) &sub_keys, sizeof(long long int) * 16);
     cudaMemcpy(sub_keys, host_sub_keys, sizeof(long long int) * 16, cudaMemcpyHostToDevice);
-    global_DES<<<(n_blocks + 1023)/1024, 1024>>>(n_blocks, MD, sub_keys);
+
+    kernel_DES<<<n_cuda_blocks, n_cuda_threads>>>(n_blocks, MD, sub_keys);
     cudaMemcpy(host_MD, MD, sizeof(long long int) * n_blocks, cudaMemcpyDeviceToHost);
+
     cudaFree(IP);
     cudaFree(FP);
     cudaFree(E);
@@ -246,7 +254,7 @@ void runDESCuda(unsigned int n_blocks, long long int *host_MD, long long int *ho
 }
 
 unsigned int n_blocks = 0;
-void des_with_file(int decrypt, char *in, char *out, char *key) {
+void des_with_file(int decrypt, char *in, char *out, char *key, int n_cuda_blocks, int n_cuda_threads) {
     int buf_size = 8 * n_blocks;
     char *buf = (char *) malloc(sizeof(char) * buf_size);
     FILE *in_fp = fopen(in, "rb");
@@ -273,7 +281,7 @@ void des_with_file(int decrypt, char *in, char *out, char *key) {
     }
 
     long long int *sub_keys = generate_sub_keys(binary_key, decrypt);
-    runDESCuda(n_blocks, MD, sub_keys);
+    runDESCuda(n_blocks, MD, sub_keys, n_cuda_blocks, n_cuda_threads);
     free(sub_keys);
 
     for (i = 0; i < n_blocks; i++) {
@@ -292,29 +300,33 @@ void des_with_file(int decrypt, char *in, char *out, char *key) {
     free(MD);
 }
 
-void encryption(char *in, char *out, char *key) {
-    des_with_file(0, in, out, key);
+void encryption(char *in, char *out, char *key, int n_cuda_blocks, int n_cuda_threads) {
+    des_with_file(0, in, out, key, n_cuda_blocks, n_cuda_threads);
 }
 
-void decryption(char *in, char *out, char *key) {
-    des_with_file(1, in, out, key);
+void decryption(char *in, char *out, char *key, int n_cuda_blocks, int n_cuda_threads) {
+    des_with_file(1, in, out, key, n_cuda_blocks, n_cuda_threads);
 }
 
 int main(int argc, char** argv) {
     if (argc < 6) {
-        printf("usage) ./des.out [e|d] <input_file> <output_file> <n_blocks>\n");
+        printf("usage) ./des.out [e|d] <input_file> <output_file> <n_des_block_size> <n_cuda_blocks> <n_cuda_threads>\n");
         printf("example) ./des.out e in.txt out.txt 1\n");
         return -1;
     }
+    int n_cuda_blocks;
+    int n_cuda_threads;
     sscanf(argv[5], "%d", &n_blocks);
+    sscanf(argv[6], "%d", &n_cuda_blocks);
+    sscanf(argv[7], "%d", &n_cuda_threads);
     switch(argv[1][0]) {
         case 'e':
             printf("encryption\n");
-            encryption(argv[2], argv[3], argv[4]);
+            encryption(argv[2], argv[3], argv[4], n_cuda_blocks, n_cuda_threads);
             break;
         case 'd':
             printf("decryption\n");
-            decryption(argv[2], argv[3], argv[4]);
+            decryption(argv[2], argv[3], argv[4], n_cuda_blocks, n_cuda_threads);
             break;
         default:
             printf("mode must be 'e' or 'd'\n");
