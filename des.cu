@@ -5,9 +5,6 @@ __device__ int IP[64];
 __device__ int FP[64];
 __device__ int E[48];
 __device__ int P[32];
-__device__ int PC1_LEFT[28];
-__device__ int PC1_RIGHT[28];
-__device__ int PC2[28];
 __device__ int SBox[8][64];
 
 
@@ -55,21 +52,21 @@ int host_P[32] = {
     18, 12, 29,  5, 21, 10,  3, 24
 };
 
-int host_PC1_LEFT[28] = {
+int PC1_LEFT[28] = {
     56, 48, 40, 32, 24, 16,  8,
      0, 57, 49, 41, 33, 25, 17,
      9,  1, 58, 50, 42, 34, 26,
     18, 10,  2, 59, 51, 43, 35,
 };
 
-int host_PC1_RIGHT[28] = {
+int PC1_RIGHT[28] = {
     62, 54, 46, 38, 30, 22, 14,
      6, 61, 53, 45, 37, 29, 21,
     13,  5, 60, 52, 44, 36, 28,
     20, 12,  4, 27, 19, 11,  3
 };
 
-int host_PC2[48] = {
+int PC2[48] = {
     13, 16, 10, 23,  0,  4,
      2, 27, 14,  5, 20,  9,
     22, 18, 11,  3, 25,  7,
@@ -231,9 +228,6 @@ void runDESCuda(unsigned int n_blocks, long long int *host_MD, long long int *ho
     cudaMemcpyToSymbol(FP, host_FP, sizeof(host_FP));
     cudaMemcpyToSymbol(E, host_E, sizeof(host_E));
     cudaMemcpyToSymbol(P, host_P, sizeof(host_P));
-    cudaMemcpyToSymbol(PC1_LEFT, host_PC1_LEFT, sizeof(host_PC1_LEFT));
-    cudaMemcpyToSymbol(PC1_RIGHT, host_PC1_RIGHT, sizeof(host_PC1_RIGHT));
-    cudaMemcpyToSymbol(PC2, host_PC2, sizeof(host_PC2));
     cudaMemcpyToSymbol(SBox, host_SBox, sizeof(host_SBox));
     long long int *MD, *sub_keys;
     cudaMalloc((void **) &MD, sizeof(long long int) * n_blocks);
@@ -246,9 +240,6 @@ void runDESCuda(unsigned int n_blocks, long long int *host_MD, long long int *ho
     cudaFree(FP);
     cudaFree(E);
     cudaFree(P);
-    cudaFree(PC1_LEFT);
-    cudaFree(PC1_RIGHT);
-    cudaFree(PC2);
     cudaFree(SBox);
     cudaFree(MD);
     cudaFree(sub_keys);
