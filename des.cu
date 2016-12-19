@@ -8,7 +8,6 @@ __device__ int P[32];
 __device__ int PC1_LEFT[28];
 __device__ int PC1_RIGHT[28];
 __device__ int PC2[28];
-__device__ int Rotations[16];
 __device__ int SBox[8][64];
 
 
@@ -81,7 +80,7 @@ int host_PC2[48] = {
     45, 41, 49, 35, 28, 31
 };
 
-int host_Rotations[16] = {1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1};
+int Rotations[16] = {1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1};
 
 // Substitution Boxes
 int host_SBox[8][64] = {
@@ -150,11 +149,84 @@ int host_SBox[8][64] = {
     }
 };
 
-__global__ void add(long long int *c) {
-    *c = SBox[2][3];
+__device__
+__host__
+long long int permutation(long long int data, int data_size, int *table, int table_size) {
+    long long int result = 0;
+    int i = 0;
+    for (; i < table_size; i++) {
+        result = (result << 1) + ((data >> (data_size - 1 - table[i])) & 0x1);
+    }
+    return result;
 }
 
-int main(void) {
+long long int *generate_sub_keys(long long int key, int decrypt) {
+    int n_keys = 16;
+    long long int *sub_keys = (long long int *) malloc(sizeof(long long int) * n_keys);
+    int half_key_length = 28;
+    long long int left = permutation(key, 64, PC1_LEFT, half_key_length);
+    long long int right = permutation(key, 64, PC1_RIGHT, half_key_length);
+    int i = 0;
+    for (; i < n_keys; i++) {
+        int rotation = Rotations[i];
+        left = (((left << rotation) | (left >> (half_key_length - rotation))) & 0xFFFFFFF);
+        right = (((right << rotation) | (right >> (half_key_length - rotation))) & 0xFFFFFFF);
+        long long int new_key = (left << half_key_length) | right;
+        int sub_key_index = (decrypt ? 15 - i : i);
+        sub_keys[sub_key_index] = permutation(new_key, half_key_length * 2, PC2, 48);
+    }
+    return sub_keys;
+}
+
+__device__
+long long int substitution(long long int data) {
+    // data: 48 bit
+    long long int result = 0;
+    int i = 0;
+    for (; i < 8; i++) {
+        unsigned int box = data >> (6 * (7 - i)) & 0x3F;
+        int outer = ((box & 0x20) >> 4) | (box & 0x1);
+        int inner = (box & 0x1E) >> 1;
+        result = (result << 4) + SBox[i][(outer << 4) + inner];
+    }
+    return result;
+}
+
+__device__
+long int F(unsigned int c, long long int key) {
+    long long int lc = c;
+    long long int new_c = permutation(lc, 32, E, 48);
+    long long int mixed_data = new_c ^ key;
+    long long int s_box_result = substitution(mixed_data);
+    return permutation(s_box_result, 32, P, 32);
+}
+
+__device__
+void DES(int index, long long int *MD, long long int *keys) {
+    long long int data = permutation(MD[index], 64, IP, 64);
+    unsigned int left = data >> 32;
+    unsigned int right = (int) data;
+    int i = 0;
+    for (; i < 16; i++) {
+        unsigned int buf = left ^ F(right, keys[i]);
+        left = right;
+        right = buf;
+    }
+    data = right;
+    data = (data << 32) + left;
+    MD[index] = permutation(data, 64, FP, 64);
+}
+
+__global__
+void global_DES(unsigned int n_blocks, long long int *MD, long long int *keys) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= n_blocks) {
+        return;
+    }
+    DES(0, &MD[index], keys);
+}
+
+void runDESCuda(unsigned int n_blocks, long long int *host_MD, long long int *host_sub_keys) {
     cudaMemcpyToSymbol(IP, host_IP, sizeof(host_IP));
     cudaMemcpyToSymbol(FP, host_FP, sizeof(host_FP));
     cudaMemcpyToSymbol(E, host_E, sizeof(host_E));
@@ -162,13 +234,14 @@ int main(void) {
     cudaMemcpyToSymbol(PC1_LEFT, host_PC1_LEFT, sizeof(host_PC1_LEFT));
     cudaMemcpyToSymbol(PC1_RIGHT, host_PC1_RIGHT, sizeof(host_PC1_RIGHT));
     cudaMemcpyToSymbol(PC2, host_PC2, sizeof(host_PC2));
-    cudaMemcpyToSymbol(Rotations, host_Rotations, sizeof(host_Rotations));
     cudaMemcpyToSymbol(SBox, host_SBox, sizeof(host_SBox));
-    long long int hostC = 0;
-    long long int *c;
-    cudaMalloc((void **) &c, sizeof(long long int));
-    add<<<1, 1>>>(c);
-    cudaMemcpy(&hostC, c, sizeof(long long int), cudaMemcpyDeviceToHost);
+    long long int *MD, *sub_keys;
+    cudaMalloc((void **) &MD, sizeof(long long int) * n_blocks);
+    cudaMemcpy(MD, host_MD, sizeof(long long int) * n_blocks, cudaMemcpyHostToDevice);
+    cudaMalloc((void **) &sub_keys, sizeof(long long int) * 16);
+    cudaMemcpy(sub_keys, host_sub_keys, sizeof(long long int) * 16, cudaMemcpyHostToDevice);
+    global_DES<<<(n_blocks + 1023)/1024, 1024>>>(n_blocks, MD, sub_keys);
+    cudaMemcpy(host_MD, MD, sizeof(long long int) * n_blocks, cudaMemcpyDeviceToHost);
     cudaFree(IP);
     cudaFree(FP);
     cudaFree(E);
@@ -176,9 +249,83 @@ int main(void) {
     cudaFree(PC1_LEFT);
     cudaFree(PC1_RIGHT);
     cudaFree(PC2);
-    cudaFree(Rotations);
     cudaFree(SBox);
-    cudaFree(c);
-    printf("%lld\n", hostC);
-    return 0;
+    cudaFree(MD);
+    cudaFree(sub_keys);
+}
+
+unsigned int n_blocks = 0;
+void des_with_file(int decrypt, char *in, char *out, char *key) {
+    int buf_size = 8 * n_blocks;
+    char *buf = (char *) malloc(sizeof(char) * buf_size);
+    FILE *in_fp = fopen(in, "rb");
+    if (in_fp == NULL) {
+        printf("Can't open the in file :%s\n", in);
+        return;
+    }
+    fread(buf, buf_size, 1, in_fp);
+    fclose(in_fp);
+
+    long long int *MD = (long long int *) malloc(sizeof(long long int) * n_blocks);
+    int i = 0;
+    int j = 0;
+    for (i = 0; i < n_blocks; i++) {
+        long long int block = 0;
+        for (j = 0; j < 8; j++) {
+            block = (block << 8) + (buf[(i * 8) + j] & 0xFF);
+        }
+        MD[i] = block;
+    }
+    long long int binary_key = 0;
+    for (i = 0; i < 8; i++) {
+        binary_key = (binary_key << 8) + (key[i] & 0xFF);
+    }
+
+    long long int *sub_keys = generate_sub_keys(binary_key, decrypt);
+    runDESCuda(n_blocks, MD, sub_keys);
+    free(sub_keys);
+
+    for (i = 0; i < n_blocks; i++) {
+        for (j = 0; j < 8; j++) {
+            buf[(i * 8) + (7 - j)] = ((MD[i] >> (j * 8)) & 0xFF);
+        }
+    }
+    FILE *out_fp = fopen(out, "wb");
+    if (out_fp == NULL) {
+        printf("Can't open the out file :%s\n", out);
+        return;
+    }
+    fwrite(buf, buf_size, 1, out_fp);
+    fclose(out_fp);
+    free(buf);
+    free(MD);
+}
+
+void encryption(char *in, char *out, char *key) {
+    des_with_file(0, in, out, key);
+}
+
+void decryption(char *in, char *out, char *key) {
+    des_with_file(1, in, out, key);
+}
+
+int main(int argc, char** argv) {
+    if (argc < 6) {
+        printf("usage) ./des.out [e|d] <input_file> <output_file> <n_blocks>\n");
+        printf("example) ./des.out e in.txt out.txt 1\n");
+        return -1;
+    }
+    sscanf(argv[5], "%d", &n_blocks);
+    switch(argv[1][0]) {
+        case 'e':
+            printf("encryption\n");
+            encryption(argv[2], argv[3], argv[4]);
+            break;
+        case 'd':
+            printf("decryption\n");
+            decryption(argv[2], argv[3], argv[4]);
+            break;
+        default:
+            printf("mode must be 'e' or 'd'\n");
+    }
 }
