@@ -215,12 +215,16 @@ void DES(int index, long long int *MD, long long int *keys) {
 }
 
 __global__
-void kernel_DES(unsigned int n_blocks, long long int *MD, long long int *keys) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (index >= n_blocks) {
+void kernel_DES(unsigned int quota, unsigned int n_blocks, long long int *MD, long long int *keys) {
+    int start_index = (blockIdx.x * blockDim.x + threadIdx.x) * quota;
+    int end_index = start_index + quota;
+    int i;
+    for (i = start_index; i < end_index; i++) {
+        if (i >= n_blocks) {
         return;
+        }
+        DES(i, MD, keys);
     }
-    DES(index, MD, keys);
 }
 
 void runDESCuda(unsigned int n_blocks, long long int *host_MD, long long int *host_sub_keys, int n_cuda_blocks, int n_cuda_threads) {
@@ -240,8 +244,9 @@ void runDESCuda(unsigned int n_blocks, long long int *host_MD, long long int *ho
     cudaMemcpy(MD, host_MD, sizeof(long long int) * n_blocks, cudaMemcpyHostToDevice);
     cudaMalloc((void **) &sub_keys, sizeof(long long int) * 16);
     cudaMemcpy(sub_keys, host_sub_keys, sizeof(long long int) * 16, cudaMemcpyHostToDevice);
-
-    kernel_DES<<<n_cuda_blocks, n_cuda_threads>>>(n_blocks, MD, sub_keys);
+    unsigned int quota = n_blocks / (n_cuda_blocks * n_cuda_threads) + 1;
+    printf("%u bytes per threads.\n", quota * 64);
+    kernel_DES<<<n_cuda_blocks, n_cuda_threads>>>(quota, n_blocks, MD, sub_keys);
     cudaMemcpy(host_MD, MD, sizeof(long long int) * n_blocks, cudaMemcpyDeviceToHost);
 
     cudaFree(IP);
