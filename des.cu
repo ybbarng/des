@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 __device__ int IP[64];
 __device__ int FP[64];
@@ -290,7 +291,11 @@ void des_with_file(int decrypt, char *in, char *out, char *key, int n_cuda_block
     }
 
     long long int *sub_keys = generate_sub_keys(binary_key, decrypt);
+    clock_t begin = clock();
     runDESCuda(n_blocks, MD, sub_keys, n_cuda_blocks, n_cuda_threads);
+    clock_t end = clock();
+    double time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
+    printf("CUDA time: %f\n", time_spent);
     free(sub_keys);
 
     for (i = 0; i < n_blocks; i++) {
