@@ -260,9 +260,9 @@ void decryption(char *in, char *out, char *key) {
 }
 
 int main(int argc, char** argv) {
-    if (argc < 6) {
-        printf("usage) ./des.out [e|d] <input_file> <output_file> <n_blocks>\n");
-        printf("example) ./des.out e in.txt out.txt 1\n");
+    if (argc != 6) {
+        printf("usage) ./des.out [e|d] <input_file> <output_file> <key> <n_blocks>\n");
+        printf("example) ./des.out e in.txt out.txt TESTTEST 1\n");
         return -1;
     }
     sscanf(argv[5], "%d", &n_blocks);
