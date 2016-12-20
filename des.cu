@@ -229,6 +229,10 @@ void kernel_DES(unsigned int quota, unsigned int n_blocks, long long int *MD, lo
 
 void runDESCuda(unsigned int n_blocks, long long int *host_MD, long long int *host_sub_keys, int n_cuda_blocks, int n_cuda_threads) {
     unsigned int max_n_threads = 512;
+    if (n_cuda_blocks == -1 && n_cuda_threads == -1) {
+        n_cuda_threads = max_n_threads;
+        n_cuda_blocks = (n_blocks + max_n_threads - 1) / max_n_threads;
+    }
     if (n_cuda_threads > max_n_threads) {
         printf("Maximum value of the number of threads is 512. You entered : %d\n", n_cuda_threads);
         return;
